@@ -1,0 +1,121 @@
+---
+title: "exercise-11"
+format: html
+editor: visual
+---
+
+## vload packages
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(MuMIn)
+```
+
+## load data
+
+```{r}
+d <- read_tsv("https://raw.githubusercontent.com/difiore/ada-datasets/main/Mammal_lifehistories_v2.txt", col_names = TRUE)
+```
+
+## step1
+
+```{r}
+d[d == -999.00] <- NA
+```
+
+## step2
+
+```{r}
+d <- d %>%
+  select(-c(`litter size`, refs))
+```
+
+## step3
+
+```{r}
+d <- d %>%
+  mutate(across(where(is.numeric), log))
+```
+
+## step4
+
+```{r}
+d <- d %>%
+  mutate(relGest = residuals(lm(`gestation(mo)` ~ `mass(g)`, data = d, na.action = na.exclude)),
+    relWean = residuals(lm(`weaning(mo)` ~ `mass(g)`, data = d, na.action = na.exclude)),
+    relAFR = residuals(lm(`AFR(mo)` ~ `mass(g)`, data = d, na.action = na.exclude)),
+    relLife = residuals(lm(`max. life(mo)` ~ `mass(g)`, data = d, na.action = na.exclude)),
+    relNewbornMass = residuals(lm(`newborn(g)` ~ `mass(g)`, data = d, na.action = na.exclude)),
+    relWeaningMass = residuals(lm(`wean mass(g)` ~ `mass(g)`, data = d, na.action = na.exclude)))
+```
+
+## step5
+
+```{r, warning=FALSE}
+ggplot(d, aes(x = order, y = relLife)) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+Primates has the highest residual lifespan.
+
+```{r, warning=FALSE}
+ggplot(d, aes(x = order, y = relNewbornMass)) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+Carnivora has the highest residual newborn mass.
+
+```{r,warning=FALSE}
+ggplot(d, aes(x = order, y = relWeaningMass)) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+Perissodactyla has the highest residual weaning mass.
+
+## step6
+#### max. life(mo)
+```{r}
+predictors <- c("gestation(mo)", "newborn(g)", "weaning(mo)", "wean mass(g)", "litters/year", "mass(g)")
+
+d_life <- d %>%
+  drop_na(`max. life(mo)`, all_of(predictors))
+
+options(na.action = na.fail)
+
+m_life <- lm(`max. life(mo)` ~ `gestation(mo)` + `newborn(g)` + `weaning(mo)` + `wean mass(g)` + `litters/year` + `mass(g)`, data = d_life)
+
+(mods_life <- dredge(m_life))
+```
+Here, the best model is `max. life(mo)` ~ `gestation(mo)` + `weaning(mo)` + `litters/year` + `mass(g)`. Five models have a delta of 4 or less. Gestation(mo), litters/year and weaning(mo) appear in all top models.
+```{r}
+top_life <- get.models(mods_life, subset = delta < 4)
+avg_life <- model.avg(top_life)
+summary(avg_life)
+confint(avg_life)
+plot(avg_life, full = TRUE, intercept = FALSE)
+```
+
+#### AFR(mo)
+```{r}
+d_arf <- d %>%
+  drop_na(`AFR(mo)`, all_of(predictors))
+
+options(na.action = na.fail)
+
+m_arf <- lm(`AFR(mo)` ~ `gestation(mo)` + `newborn(g)` + `weaning(mo)` + `wean mass(g)` + `litters/year` + `mass(g)`, data = d_arf)
+
+(mods_arf <- dredge(m_arf))
+```
+Here the best model is `AFR(mo)` ~ `gestation(mo)` +  `weaning(mo)` + `litters/year` + `mass(g)`. 7 models have a delta of 4 or less. Gestation(mo), litters/year and weaning(mo) appear in all top models.
+```{r}
+top_arf <- get.models(mods_arf, subset = delta < 4)
+avg_arf <- model.avg(top_arf)
+summary(avg_arf)
+confint(avg_arf)
+plot(avg_arf, full = TRUE, intercept = FALSE)
+```
